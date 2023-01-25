@@ -1,7 +1,9 @@
+//server
 const express = require("express");
 var mysql = require('mysql')
 const app = express();
-var session;
+var session
+
 
 var connection = mysql.createConnection({
     host: 'localhost',
@@ -21,39 +23,59 @@ function getSession() {
     // console.log(session)
     return session
 }
-log(tag, msg){
-
+function sql(req, res, sqlstr, callback) {
+    // console.log(callback)
+    connection.query(sqlstr, function (error, results) {
+        if (error) {
+            return error
+        } else {
+            // console.log("jaj")
+            // console.log(callback)
+            callback(req, res, results)
+        }
+    })
+    return
 }
+
 function auth(req, res, callback) {
-    console.log("检查session")
+    // console.log("检查session")
     //log("auth-req",req);
-
     // req.query.session
-    connection.query('select session from users where tel="' + req.query.tel + '";',
-        function (error, results) {
-            // log("auth-log-req")
-            if (req.query.session - results[0].session <= 7200) {
-                console.log("session未过期")
-                callback(req, res);
-            } else {
-                console.log("session过期")
-            }
+    if (req.query.tel && req.query.session) {
+        connection.query('select session from users where tel="' + req.query.tel + '";',
+            function (error, results) {
+                // log("auth-log-req")
+                if (req.query.session - results[0].session <= 7200) {
+                    console.log("session未过期")
+                    callback(req, res);
+                } else {
+                    if (!req.query.session) {
+                        console.log("前端无session（未登陆）")
+                    } else {
+                        console.log("session过期")
+                        console.log("前端session:" + req.query.session)
+                        console.log("后端session:" + results[0].session)
+                    }
+                }
 
-        })
-
+            })
+    } else {
+        console.log("表单信息不完整")
+    }
     return 0
 }
 
 app.get('/login', (req, res) => {
 
-    console.log("收到登陆请求")
+    // console.log("收到登陆请求")
     if (req.query.tel && req.query.password) {
 
         connection.query('select password from users where tel=' + req.query.tel + ';', function (error, results) {
             if (error) throw error;
             if ((results[0].password) == req.query.password) {
-                console.log('登陆密码正确')
+                // console.log('登陆密码正确')
                 session = getSession();
+
                 // console.log(session);
                 var sqlstr = 'update users set session="' + session + '" where tel="' + req.query.tel + '"'
                 // console.log(sqlstr)
@@ -70,7 +92,9 @@ app.get('/login', (req, res) => {
     else {
         res.send("表单不完整")
     }
+
 })
+
 
 app.get('/register', (req, res) => {
     console.log("收到注册请求")
@@ -127,6 +151,7 @@ app.get('/resetPwd', (req, res) => {
 
 })
 // connection.end();
-app.listen(8080, () => {
-    console.log("服务器开始运行")
-})                                                        
+module.exports = { app, connection, auth, sql }
+// module.exports = connection
+
+

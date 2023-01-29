@@ -1,4 +1,5 @@
 const axios = require('axios')
+const fs = require('fs')
 console.log("todolist请求端")
 var session;
 
@@ -100,8 +101,6 @@ axios.get('http://localhost:8080/login', {
                     class_name: 'eat',
                     parent_id: '4'//
                 }
-
-
             }
         })
             .then(function (response) {
@@ -227,7 +226,7 @@ axios.get('http://localhost:8080/login', {
         console.log(error);
     });
     */
-/*
+
 //登陆+showitmes
 axios.get('http://localhost:8080/login', {
  params: {
@@ -258,7 +257,7 @@ axios.get('http://localhost:8080/login', {
      console.log(error);
  });
 
-*/
+
 /*
 //登陆+删除类别
 axios.get('http://localhost:8080/login', {
@@ -291,6 +290,7 @@ axios.get('http://localhost:8080/login', {
         console.log(error);
     });
 */
+/*
 //登陆+删除item
 axios.get('http://localhost:8080/login', {
     params: {
@@ -321,3 +321,4 @@ axios.get('http://localhost:8080/login', {
     .catch(function (error) {
         console.log(error);
     });
+*/

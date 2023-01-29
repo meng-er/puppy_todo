@@ -11,7 +11,7 @@ function category_parent_check(req, res, tel, parent_id, callback) {
     if (parent_id != -1) {
         //有parent_id->判断是否有效
         var sqlstr = 'select * from category where tel="' + tel + '" and class_id="' + parent_id + '"'
-        sql(req, res, sqlstr, function (req, res, results) {
+        sql(req, res, sqlstr, function ( results) {
             if (results.length == 0) {
                 //parent_id无效
                 parent_alive = false
@@ -34,7 +34,7 @@ function category_new(req, res, callback) {
     var class_id
     var sqlstr = 'select * from category where tel="' + req.query.tel + '" and class_name="' + req.query.class_name + '"'
     // console.log(sql)
-    sql(req, res, sqlstr, function (req, res, results) {
+    sql(req, res, sqlstr, function (results) {
         // console.log('是否存在相同的类')
         if (results.length == 0) {
             //不存在相同的类-》新增
@@ -44,7 +44,7 @@ function category_new(req, res, callback) {
                     //不存在相同类.父类存在->新增 返回新增的class_id
                     var sqlstr = 'insert into category (parent_id,tel,class_name) values (' + req.query.parent_id + ',"' + req.query.tel + '","' + req.query.class_name + '")'
                     // console.log(sqlstr)
-                    sql(req, res, sqlstr, function (req, res, results) {
+                    sql(req, res, sqlstr, function (results) {
                         // console.log(results.insertId)
                         class_id = results.insertId
                         // res.send({ 'msg': "新增类别成功", 'code': '1', 'class_id': results.insertId })
@@ -74,14 +74,13 @@ params: {
             class_name: 'life',
             parent_id: '-1'
 }
-returns:{
-            res.send({ 'msg': "新增类别失败:父类不存在", 'code': '0' })
-            res.send({ 'msg': "新增类别失败:已存在该类", 'code': '0', 'class_id': results[0].class_id })
-            res.send({ 'msg': "新增类别成功", 'code': '1', 'class_id': results[0].class_id })
-}
+输出
+{ 'msg': "新增类别失败:父类不存在", 'code': '0' }
+{ 'msg': "新增类别失败:已存在该类", 'code': '0', 'class_id': results[0].class_id }
+{ 'msg': "新增类别成功", 'code': '1', 'class_id': results[0].class_id }
 */
 app.get('/category/new', (req, res) => {
-    auth(req, res, function (req, res) {
+    auth(req, res, function () {
         console.log("/category/new")
         category_new(req, res, function (req, res, class_id) {
             if (!class_id) {
@@ -95,12 +94,30 @@ app.get('/category/new', (req, res) => {
     })
 })
 
+/*
+params: {
+            tel: '13388110101',//不能改
+            session: session,
+            before: {
+                    class_name: 'life',//可以改
+                    parent_id: '4'//
+                },
+            after:{
+                    class_name: 'eat',
+                    parent_id: '4'//
+                }
+        }
+输出：
+{ 'msg': "修改类别失败：原类别信息错误", 'code': '0' }
+{ 'msg': "修改类别失败：父类不存在", 'code': '0' }
+{ 'msg': "修改类别成功", 'code': '1' }
+*/
 app.get('/category/modify', (req, res) => {
-    auth(req, res, function (req, res) {
+    auth(req, res, function () {
         console.log("/category/modify")
         // console.log(req.query.before)
         var sqlstr = 'select * from category where tel="' + req.query.tel + '" and class_name="' + req.query.before.class_name + '" and parent_id=' + req.query.before.parent_id
-        sql(req, res, sqlstr, function (req, res, results) {
+        sql(req, res, sqlstr, function (results) {
             if (results.length == 0) {
                 res.send({ 'msg': "修改类别失败：原类别信息错误", 'code': '0' })
             } else {
@@ -111,7 +128,7 @@ app.get('/category/modify', (req, res) => {
                         console.log(class_id)
                         console.log(req.query.after)
                         var sqlstr = 'update category set parent_id=' + req.query.after.parent_id + ',class_name="' + req.query.after.class_name + '" where class_id=' + class_id
-                        sql(req, res, sqlstr, function (req, res, results) {
+                        sql(req, res, sqlstr, function (results) {
                             res.send({ 'msg': "修改类别成功", 'code': '1' })
                         })
                     } else {
@@ -124,31 +141,48 @@ app.get('/category/modify', (req, res) => {
     })
 })
 
+/*
+params: {
+    tel: '13388110101',
+    session: session,
+}
+输出
+{ 'msg': "查找成功", 'code': '1', results }
+*/
 app.get('/category/show', (req, res) => {
-    auth(req, res, function (req, res) {
+    auth(req, res, function () {
         console.log("/category/show")
         var sqlstr = 'select * from category where tel="' + req.query.tel + '"'
-        sql(req, res, sqlstr, function (req, res, results) {
+        sql(req, res, sqlstr, function (results) {
             res.send({ 'msg': "查找成功", 'code': '1', results })
         })
     })
 })
 
+/*
+params: {
+            tel: '13388110101',
+            session: session,
+            class_id: '7'
+        }
+输出
+{ 'msg': "删除成功", 'code': '1', 'sqlmsg': results }
+*/
 app.get('/category/delete', (req, res) => {
-    auth(req, res, function (req, res) {
+    auth(req, res, function () {
         var sqlstr = 'select * from category where class_id=' + req.query.class_id
-        sql(req, res, sqlstr, function (req, res, results) {
+        sql(req, res, sqlstr, function (results) {
             if (results[0].parent_id) {
                 //有父类->子类的父类改为该父
                 var sqlstr = 'update category set parent_id=' + results[0].parent_id + ' where parent_id=' + req.query.class_id
                 console.log(sqlstr)
-                sql(req, res, sqlstr, function (req, res, results) {
-                    console.log(results)
+                sql(req, res, sqlstr, function (results) {
+                    // console.log(results)
                     var sqlstr = 'update items set class_id=NULL where class_id=' + req.query.class_id
                     console.log(sqlstr)
-                    sql(req, res, sqlstr, function (req, res, results) {
+                    sql(req, res, sqlstr, function (results) {
                         var sqlstr = 'delete from category where class_id=' + req.query.class_id
-                        sql(req, res, sqlstr, function (req, res, results) {
+                        sql(req, res, sqlstr, function (results) {
                             res.send({ 'msg': "删除成功", 'code': '1', 'sqlmsg': results })
                         })
                     })
@@ -156,12 +190,12 @@ app.get('/category/delete', (req, res) => {
             } else {
                 //没有父类
                 var sqlstr = 'update category set parent_id=NULL where parent_id=' + req.query.class_id
-                sql(req, res, sqlstr, function (req, res, results) {
+                sql(req, res, sqlstr, function (results) {
                     var sqlstr = 'update items set class_id=NULL where class_id=' + req.query.class_id
                     console.log(sqlstr)
-                    sql(req, res, sqlstr, function (req, res, results) {
+                    sql(req, res, sqlstr, function (results) {
                         var sqlstr = 'delete from category where class_id=' + req.query.class_id
-                        sql(req, res, sqlstr, function (req, res, results) {
+                        sql(req, res, sqlstr, function (results) {
                             res.send({ 'msg': "删除成功", 'code': '1', 'sqlmsg': results })
                         })
                     })
@@ -171,9 +205,21 @@ app.get('/category/delete', (req, res) => {
     })
 })
 
-
+/*
+params: {
+                tel: '13388110101',
+                session: session,
+                title: '恰饭',
+                note: '',
+                start: '2023-3-25 13:02:23',
+                end: '2023-3-25 13:02:23',
+                class_name: ''
+            }
+输出
+{ 'msg': '新增事项成功', 'code': '1', '事项id': results.insertId }
+*/
 app.get('/item/new', (req, res) => {
-    auth(req, res, function (req, res) {
+    auth(req, res, function () {
         var class_id
         console.log("/item/new")
         if (req.query.class_name) {
@@ -181,22 +227,45 @@ app.get('/item/new', (req, res) => {
             category_new(req, res, function (req, res, class_id) {
                 // console.log(class_id)
                 var sqlstr = 'insert into items (tel,title,note,start,end,class_id) values ("' + req.query.tel + '","' + req.query.title + '","' + req.query.note + '","' + req.query.start + '","' + req.query.end + '",' + class_id + ')'
-                sql(req, res, sqlstr, function (req, res, results) {
+                sql(req, res, sqlstr, function (results) {
                     res.send({ 'msg': '新增事项成功', 'code': '1', '事项id': results.insertId })
                 })
             })
         } else {
             var sqlstr = 'insert into items (tel,title,note,start,end) values ("' + req.query.tel + '","' + req.query.title + '","' + req.query.note + '","' + req.query.start + '","' + req.query.end + '")'
-            sql(req, res, sqlstr, function (req, res, results) {
+            sql(req, res, sqlstr, function (results) {
                 res.send({ 'msg': '新增事项成功', 'code': '1', '事项id': results.insertId })
             })
         }
     })
 })
 
+/*
+params: {
+                tel: '13388110101',
+                session: session,
+                item_id: '3',
+                before: {
+                    title: '恰饭',
+                    note: '',
+                    start: '2023-3-25 13:02:23',
+                    end: '2023-3-25 13:02:23',
+                    class_id: '7'
+                },
+                after: {
+                    title: '恰饭',
+                    note: '',
+                    start: '',
+                    end: '2023-3-25 13:02:23',
+                    class_id: '8'
+                }
+            }
+输出
+{ 'msg': '修改完成', 'code': 1 }
+*/
 app.get('/item/modify', (req, res) => {
-    auth(req, res, function (req, res) {
-        console.log(req.query.after)
+    auth(req, res, function () {
+        // console.log(req.query.after)
         var sqlstr
         if (!req.query.after.start && !req.query.after.end) {
             sqlstr = 'update items set title="' + req.query.after.title + '",note="' + req.query.after.note + '",start=NULL,end=NULL,class_id=' + req.query.after.class_id + ' where item_id=' + req.query.item_id
@@ -215,26 +284,43 @@ app.get('/item/modify', (req, res) => {
             }
         }
         // console.log(sqlstr);
-        sql(req, res, sqlstr, function (req, res, results) {
+        sql(req, res, sqlstr, function (results) {
             res.send({ 'msg': '修改完成', 'code': 1 })
         })
     })
 })
 
+/*
+ params: {
+             tel: '13388110101',
+             session: session,
+         }
+输出
+{ 'msg': "查找成功", 'code': '1', 'sqlmsg': results }
+*/
 app.get('/item/show', (req, res) => {
-    auth(req, res, function (req, res) {
+    auth(req, res, function () {
         console.log("/item/show")
         var sqlstr = 'select * from items where tel="' + req.query.tel + '"'
-        sql(req, res, sqlstr, function (req, res, results) {
+        sql(req, res, sqlstr, function (results) {
             res.send({ 'msg': "查找成功", 'code': '1', 'sqlmsg': results })
         })
     })
 })
 
+/*
+params: {
+            tel: '13388110101',
+            session: session,
+            item_id: '5'
+        }
+输出
+{ 'msg': "删除成功", 'code': '1', 'sqlmsg': results }
+*/
 app.get('/item/delete', (req, res) => {
-    auth(req, res, function (req, res) {
+    auth(req, res, function () {
         var sqlstr = 'delete from items where item_id=' + req.query.item_id
-        sql(req, res, sqlstr, function (req, res, results) {
+        sql(req, res, sqlstr, function (results) {
             res.send({ 'msg': "删除成功", 'code': '1', 'sqlmsg': results })
         })
     })

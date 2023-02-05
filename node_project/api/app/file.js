@@ -7,14 +7,8 @@ var path = "../pic";//修改成自己的路径
 var jsonParser = bodyParser.json({
     limit: '50mb'
 })
-// var urlencodedParser = bodyParser.urlencoded({
-//     limit: '50mb',
-//     extended: true
-// })
+
 app.use(jsonParser)
-// app.use(urlencodedParser)
-// app.use(express.json()) // for parsing application/json
-// app.use(express.urlencoded({ extended: true })) // for parsing application/x-www-form-urlencoded
 
 app.post('/file', function (req, res) {
     // var data = req.body.bitmap.data

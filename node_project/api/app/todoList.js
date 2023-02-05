@@ -1,69 +1,71 @@
-var user = require('../user.js')
-var connection = user.connection
-var auth = user.auth
-var sql = user.sql
-var app = user.app
 
-function category_parent_check(req, res, tel, parent_id, callback) {
-    //验证类别的parent是否存在
-    //用到情况：/category/new，category/modify
-    var parent_alive//父类是否存在，结果，bool
-    if (parent_id != -1) {
-        //有parent_id->判断是否有效
-        var sqlstr = 'select * from category where tel="' + tel + '" and class_id="' + parent_id + '"'
-        sql(req, res, sqlstr, function ( results) {
-            if (results.length == 0) {
-                //parent_id无效
-                parent_alive = false
-                callback(req, res, parent_alive)
-            }
-            else {
-                //parent_id有效->新增分类
-                parent_alive = true
-                callback(req, res, parent_alive)
-            }
-        })
-    } else {
-        //parent_id=-1
-        parent_alive = true
-        callback(req, res, parent_alive)
-    }
-}
+const { getSession, log, succInfo, errInfo, dbQuery, reqAuth } = require('./main.js')
+const { app } = require('./user.js')
+// //中间件接收post
+// const bodyParser = require('body-parser')
+// app.use(bodyParser.json({}))
 
-function category_new(req, res, callback) {
-    var class_id
-    var sqlstr = 'select * from category where tel="' + req.query.tel + '" and class_name="' + req.query.class_name + '"'
-    // console.log(sql)
-    sql(req, res, sqlstr, function (results) {
-        // console.log('是否存在相同的类')
-        if (results.length == 0) {
-            //不存在相同的类-》新增
-            category_parent_check(req, res, req.query.tel, req.query.parent_id, function (req, res, parent_alive) {
-                // console.log(parent_alive)
-                if (parent_alive) {
-                    //不存在相同类.父类存在->新增 返回新增的class_id
-                    var sqlstr = 'insert into category (parent_id,tel,class_name) values (' + req.query.parent_id + ',"' + req.query.tel + '","' + req.query.class_name + '")'
-                    // console.log(sqlstr)
-                    sql(req, res, sqlstr, function (results) {
-                        // console.log(results.insertId)
-                        class_id = results.insertId
-                        // res.send({ 'msg': "新增类别成功", 'code': '1', 'class_id': results.insertId })
-                        callback(req, res, class_id)
-                    })
-                } else {
-                    //父类不存在
-                    // console.log("父类不存在")
-                    class_id = ''
-                    console.log({ 'msg': "新增类别失败:父类不存在", 'code': '0' })
-                    callback(req, res, class_id)
+function category_parent_check(tel, parent_id) {
+    /*
+    有parent_id？-无->succInfo("成功")
+                -有->parent_id有效否？-无->
+                                    -有->
+    */
+    return new Promise((resolve, reject) => {
+        const category_parent_check = async (tel, parent_id) => {
+            // var parent_alive//父类是否存在，结果，bool
+            if (parent_id != 0) {
+                const resObj = await dbQuery('select * from category where tel=? and class_id=?', [tel, parent_id])
+                if (resObj.results.length != 1) {
+                    resolve(errInfo("parent_id无效"))
                 }
-            })
-        } else {
-            //存在相同的类
-            class_id = results[0].class_id
-            // console.log({ 'msg': "新增类别失败:已存在该类", 'code': '0', 'class_id': class_id })
-            callback(req, res, class_id)
+                else {
+                    resolve(succInfo("parent_id有效", resObj.results))
+                }
+            } else {
+                resolve(succInfo("没有parent"))
+            }
         }
+        category_parent_check(tel, parent_id)
+    })
+}
+//新增类别
+/*
+已存在该类？-是->errInfo("已存在该类")
+          -否->父类存在？-是->succInfo("新增成功",class_id)
+                       -否->errInfo("父类不存在")
+*/
+function category_new(req, res) {
+    return new Promise((resolve, reject) => {
+        const category_new = async (req, res) => {
+            log(req.body.tel)
+            log(req.body.class_name)
+
+            const resObj = await dbQuery('select * from category where tel=? and class_name=?', [req.body.tel, req.body.class_name])
+            // console.log(resObj.results.length)
+            if (resObj.results.length != 0) {
+                resolve(errInfo("已存在该类", resObj.results[0].class_id))
+                return
+            }
+            // console.log(req.body.tel)
+            // console.log(req.body.parent_id)
+            const isParentObj = await category_parent_check(req.body.tel, req.body.parent_id)
+
+
+
+            console.log(isParentObj)
+            if (isParentObj.code) {
+                console.log("ss")
+                dbQuery('insert into category (parent_id,tel,class_name) values (?,?,?)', [req.body.parent_id, req.body.tel, req.body.class_name])
+                    .then((resObj) => {
+                        resolve(succInfo("新增类别成功", resObj.results.insertId))
+                        return
+                    })
+            } else {
+                resolve(errInfo("父类无效"))
+            }
+        }
+        category_new(req, res)
     })
 }
 
@@ -79,19 +81,21 @@ params: {
 { 'msg': "新增类别失败:已存在该类", 'code': '0', 'class_id': results[0].class_id }
 { 'msg': "新增类别成功", 'code': '1', 'class_id': results[0].class_id }
 */
-app.get('/category/new', (req, res) => {
-    auth(req, res, function () {
-        console.log("/category/new")
-        category_new(req, res, function (req, res, class_id) {
-            if (!class_id) {
-                console.log("-1")
-                res.send({ 'msg': "新增类别失败:父类不存在", 'code': '0' })
-            } else {
-                //新增成功包含两种情况，（1）本来就啥也没有，新增成功；（2）发来的请求的classname是已经存在的，返回已存在的那个类的id，也叫新增成功
-                res.send({ 'msg': "新增成功", 'code': '1', 'class_id': class_id })
-            }
-        })
-    })
+app.post('/category/new', (req, res) => {
+    if (!req.body.tel || !req.body.class_name || !req.body.parent_id || !req.body.session) {
+        res.send(errInfo("新增类别信息不完整"))
+    }
+    const category_new_main = async (req, res) => {
+        await reqAuth(req, res)
+        const category_new_resObj = await category_new(req, res)
+        // log(category_new_resObj)
+        if (category_new_resObj.code) {
+            res.send(succInfo("新增成功", category_new_resObj.msg))
+        } else {
+            res.send(errInfo("新增失败"))
+        }
+    }
+    category_new_main(req, res)
 })
 
 /*
@@ -112,33 +116,37 @@ params: {
 { 'msg': "修改类别失败：父类不存在", 'code': '0' }
 { 'msg': "修改类别成功", 'code': '1' }
 */
-app.get('/category/modify', (req, res) => {
-    auth(req, res, function () {
-        console.log("/category/modify")
-        // console.log(req.query.before)
-        var sqlstr = 'select * from category where tel="' + req.query.tel + '" and class_name="' + req.query.before.class_name + '" and parent_id=' + req.query.before.parent_id
-        sql(req, res, sqlstr, function (results) {
-            if (results.length == 0) {
-                res.send({ 'msg': "修改类别失败：原类别信息错误", 'code': '0' })
-            } else {
-                category_parent_check(req, res, req.query.tel, req.query.after.parent_id, function (req, res, parent_alive) {
-                    // console.log("判断parent——id是否存在")
-                    if (parent_alive) {
-                        var class_id = results[0].class_id
-                        console.log(class_id)
-                        console.log(req.query.after)
-                        var sqlstr = 'update category set parent_id=' + req.query.after.parent_id + ',class_name="' + req.query.after.class_name + '" where class_id=' + class_id
-                        sql(req, res, sqlstr, function (results) {
-                            res.send({ 'msg': "修改类别成功", 'code': '1' })
-                        })
-                    } else {
-                        //父类不存在
-                        res.send({ 'msg': "修改类别失败：父类不存在", 'code': '0' })
-                    }
-                })
-            }
-        })
-    })
+app.post('/category/modify', (req, res) => {
+    if (!req.body.tel || !req.body.session || !req.body.before.class_name || !req.body.before.parent_id || !req.body.after.class_name || !req.body.after.parent_id) {
+        res.send(errInfo("修改类别信息不完整"))
+    }
+    const category_modify = async (req, res) => {
+        await reqAuth(req, res)
+        const dbResObj = await dbQuery('select * from category where tel=? and class_name=? and parent_id=?', [req.body.tel, req.body.before.class_name, req.body.before.parent_id])
+        if (dbResObj.results.length == 0) {
+            res.send(errInfo("原类别信息错误"))
+            return
+        }
+        const isParentObj = await category_parent_check(req.body.tel, req.body.after.parent_id)
+        if (!isParentObj.code) {
+            res.send(errInfo("父类不存在"))
+            return
+        }
+        console.log(isParentObj)
+        var class_id = isParentObj.data[0].class_id
+        dbQuery('update category set parent_id=?,class_name=? where class_id=?', [req.body.after.parent_id, req.body.after.class_name, class_id])
+            .then((dbResObj) => {
+                if (dbResObj.error) {
+                    log(dbResObj.error)
+                    res.send(errInfo("数据库错误"))
+                    return
+                }
+                res.send(succInfo("修改类别成功"))
+            })
+
+    }
+    category_modify(req, res)
+
 })
 
 /*
@@ -149,14 +157,14 @@ params: {
 输出
 { 'msg': "查找成功", 'code': '1', results }
 */
-app.get('/category/show', (req, res) => {
-    auth(req, res, function () {
-        console.log("/category/show")
-        var sqlstr = 'select * from category where tel="' + req.query.tel + '"'
-        sql(req, res, sqlstr, function (results) {
-            res.send({ 'msg': "查找成功", 'code': '1', results })
+app.post('/category/show', (req, res) => {
+    const category_show = async (req, res) => {
+        await reqAuth(req, res)
+        await dbQuery('select * from category where tel=?', req.body.tel).then((dbResObj) => {
+            res.send(succInfo("查找成功", dbResObj.results))
         })
-    })
+    }
+    category_show(req, res)
 })
 
 /*
@@ -168,41 +176,35 @@ params: {
 输出
 { 'msg': "删除成功", 'code': '1', 'sqlmsg': results }
 */
-app.get('/category/delete', (req, res) => {
-    auth(req, res, function () {
-        var sqlstr = 'select * from category where class_id=' + req.query.class_id
-        sql(req, res, sqlstr, function (results) {
-            if (results[0].parent_id) {
-                //有父类->子类的父类改为该父
-                var sqlstr = 'update category set parent_id=' + results[0].parent_id + ' where parent_id=' + req.query.class_id
-                console.log(sqlstr)
-                sql(req, res, sqlstr, function (results) {
-                    // console.log(results)
-                    var sqlstr = 'update items set class_id=NULL where class_id=' + req.query.class_id
-                    console.log(sqlstr)
-                    sql(req, res, sqlstr, function (results) {
-                        var sqlstr = 'delete from category where class_id=' + req.query.class_id
-                        sql(req, res, sqlstr, function (results) {
-                            res.send({ 'msg': "删除成功", 'code': '1', 'sqlmsg': results })
-                        })
-                    })
-                })
-            } else {
-                //没有父类
-                var sqlstr = 'update category set parent_id=NULL where parent_id=' + req.query.class_id
-                sql(req, res, sqlstr, function (results) {
-                    var sqlstr = 'update items set class_id=NULL where class_id=' + req.query.class_id
-                    console.log(sqlstr)
-                    sql(req, res, sqlstr, function (results) {
-                        var sqlstr = 'delete from category where class_id=' + req.query.class_id
-                        sql(req, res, sqlstr, function (results) {
-                            res.send({ 'msg': "删除成功", 'code': '1', 'sqlmsg': results })
-                        })
-                    })
-                })
-            }
-        })
-    })
+app.post('/category/delete', (req, res) => {
+    const category_delete = async (req, res) => {
+        await reqAuth(req, res)
+        let dbResObj = await dbQuery('select * from category where class_id=?', req.body.class_id)
+        if (dbResObj.results.length != 1) {
+            res.send(errInfo("class_id错误"))
+            return
+        }
+        if (dbResObj.results[0].parent_id) {
+            //有父类->子类的父类改为该父
+            await dbQuery('update category set parent_id=? where parent_id=?', [dbResObj.results[0].parent_id, req.body.class_id])
+            await dbQuery('update items set class_id=-1 where class_id=?', req.body.class_id)
+            // console.log(results)
+            await dbQuery('delete from category where class_id=?', req.body.class_id).then((dbResObj) => {
+                res.send(succInfo("删除成功", dbResObj.results))
+
+            })
+        } else {
+            //没有父类
+            await dbQuery('update category set parent_id=-1 where parent_id=?', req.body.class_id)
+            await dbQuery('update items set class_id=-1 where class_id=?', req.body.class_id)
+            // console.log(results)
+            await dbQuery('delete from category where class_id=?', req.body.class_id).then((dbResObj) => {
+                res.send(succInfo("删除成功", dbResObj.results))
+
+            })
+        }
+    }
+    category_delete(req, res)
 })
 
 /*
@@ -218,26 +220,37 @@ params: {
 输出
 { 'msg': '新增事项成功', 'code': '1', '事项id': results.insertId }
 */
-app.get('/item/new', (req, res) => {
-    auth(req, res, function () {
-        var class_id
-        console.log("/item/new")
-        if (req.query.class_name) {
+app.post('/item/new', (req, res) => {
+    if (!req.body.tel || !req.body.session || !req.body.title) {
+        res.send(errInfo("新增事项信息不完整"))
+    }
+    const item_new = async (req, res) => {
+        await reqAuth(req, res)
+        if (req.body.class_id) {
             //有分类
-            category_new(req, res, function (req, res, class_id) {
-                // console.log(class_id)
-                var sqlstr = 'insert into items (tel,title,note,start,end,class_id) values ("' + req.query.tel + '","' + req.query.title + '","' + req.query.note + '","' + req.query.start + '","' + req.query.end + '",' + class_id + ')'
-                sql(req, res, sqlstr, function (results) {
-                    res.send({ 'msg': '新增事项成功', 'code': '1', '事项id': results.insertId })
+            dbQuery('insert into items (tel,title,note,start,end,class_id) values (?,?,?,?,?,?)', [req.body.tel, req.body.title, req.body.note, req.body.start, req.body.end, req.body.class_id])
+                .then((dbResObj) => {
+                    if (dbResObj.error) {
+                        log(resObj.error)
+                        res.send(errInfo("数据库错误"))
+                        return
+                    }
+                    res.send(succInfo("新增事项成功"))
                 })
-            })
         } else {
-            var sqlstr = 'insert into items (tel,title,note,start,end) values ("' + req.query.tel + '","' + req.query.title + '","' + req.query.note + '","' + req.query.start + '","' + req.query.end + '")'
-            sql(req, res, sqlstr, function (results) {
-                res.send({ 'msg': '新增事项成功', 'code': '1', '事项id': results.insertId })
-            })
+            console.log("else")
+            dbQuery('insert into items (tel,title,note,start,end,class_id) values (?,?,?,?,?,?)', [req.body.tel, req.body.title, req.body.note, req.body.start, req.body.end, -1])
+                .then((dbResObj) => {
+                    if (dbResObj.error) {
+                        log(resObj.error)
+                        res.send(errInfo("数据库错误"))
+                        return
+                    }
+                    res.send(succInfo("新增事项成功"))
+                })
         }
-    })
+    }
+    item_new(req, res)
 })
 
 /*
@@ -263,31 +276,32 @@ params: {
 输出
 { 'msg': '修改完成', 'code': 1 }
 */
-app.get('/item/modify', (req, res) => {
-    auth(req, res, function () {
-        // console.log(req.query.after)
-        var sqlstr
-        if (!req.query.after.start && !req.query.after.end) {
-            sqlstr = 'update items set title="' + req.query.after.title + '",note="' + req.query.after.note + '",start=NULL,end=NULL,class_id=' + req.query.after.class_id + ' where item_id=' + req.query.item_id
+app.post('/item/modify', (req, res) => {
+    if (!req.body.tel || !req.body.session || !req.body.item_id || !req.body.before.title || !req.body.after.title) {
+        res.send(errInfo("修改事项信息不完整"))
+    }
+    const item_modify = async (req, res) => {
+        await reqAuth(req, res)
+        let sqlstr
+        if (!req.body.after.start && !req.body.after.end) {
+            sqlstr = 'update items set title="' + req.body.after.title + '",note="' + req.body.after.note + '",start=NULL,end=NULL,class_id=' + req.body.after.class_id + ' where item_id=' + req.body.item_id
             console.log(sqlstr)
         } else {
-            if (!req.query.after.start) {
-                sqlstr = 'update items set title="' + req.query.after.title + '",note="' + req.query.after.note + '",start=NULL,end="' + req.query.after.end + '",class_id=' + req.query.after.class_id + ' where item_id=' + req.query.item_id
+            if (!req.body.after.start) {
+                sqlstr = 'update items set title="' + req.body.after.title + '",note="' + req.body.after.note + '",start=NULL,end="' + req.body.after.end + '",class_id=' + req.body.after.class_id + ' where item_id=' + req.body.item_id
                 // console.log(sqlstr)
             } else {
-                if (!req.query.after.end) {
-                    sqlstr = 'update items set title="' + req.query.after.title + '",note="' + req.query.after.note + '",start="' + req.query.after.start + '",end=NULL,class_id=' + req.query.after.class_id + ' where item_id=' + req.query.item_id
+                if (!req.body.after.end) {
+                    sqlstr = 'update items set title="' + req.body.after.title + '",note="' + req.body.after.note + '",start="' + req.body.after.start + '",end=NULL,class_id=' + req.body.after.class_id + ' where item_id=' + req.body.item_id
                 }
                 else {
-                    sqlstr = 'update items set title="' + req.query.after.title + '",note="' + req.query.after.note + '",start="' + req.query.after.start + '",end="' + req.query.after.end + '",class_id=' + req.query.after.class_id + ' where item_id=' + req.query.item_id
+                    sqlstr = 'update items set title="' + req.body.after.title + '",note="' + req.body.after.note + '",start="' + req.body.after.start + '",end="' + req.body.after.end + '",class_id=' + req.body.after.class_id + ' where item_id=' + req.body.item_id
                 }
             }
         }
-        // console.log(sqlstr);
-        sql(req, res, sqlstr, function (results) {
-            res.send({ 'msg': '修改完成', 'code': 1 })
-        })
-    })
+        dbQuery(sqlstr, []).then((res) => { res.send(succInfo("修改成功")) })
+    }
+    item_modify(req, res)
 })
 
 /*
@@ -298,14 +312,18 @@ app.get('/item/modify', (req, res) => {
 输出
 { 'msg': "查找成功", 'code': '1', 'sqlmsg': results }
 */
-app.get('/item/show', (req, res) => {
-    auth(req, res, function () {
-        console.log("/item/show")
-        var sqlstr = 'select * from items where tel="' + req.query.tel + '"'
-        sql(req, res, sqlstr, function (results) {
-            res.send({ 'msg': "查找成功", 'code': '1', 'sqlmsg': results })
-        })
-    })
+app.post('/item/show', (req, res) => {
+    if (!req.body.tel || !req.body.session) {
+        res.send(errInfo("itemshow事项信息不完整"))
+    }
+    const showItem = async (req, res) => {
+        await reqAuth(req, res)
+        dbQuery('select * from items where tel=?', req.body.tel)
+            .then((dbResObj) => {
+                res.send(succInfo("查找成功", dbResObj.results))
+            })
+    }
+    showItem(req, res)
 })
 
 /*
@@ -317,13 +335,23 @@ params: {
 输出
 { 'msg': "删除成功", 'code': '1', 'sqlmsg': results }
 */
-app.get('/item/delete', (req, res) => {
-    auth(req, res, function () {
-        var sqlstr = 'delete from items where item_id=' + req.query.item_id
-        sql(req, res, sqlstr, function (results) {
-            res.send({ 'msg': "删除成功", 'code': '1', 'sqlmsg': results })
-        })
-    })
+app.post('/item/delete', (req, res) => {
+    if (!req.body.tel || !req.body.session || !req.body.item_id) {
+        res.send(errInfo("itemdelete信息不完整"))
+    }
+    const item_delete = async (req, res) => {
+        await reqAuth(req, res)
+        dbQuery('delete from items where item_id=?', req.body.item_id)
+            .then((dbResObj) => {
+                if (resObj.error) {
+                    log(resObj.error)
+                    res.send(errInfo("数据库错误"))
+                    return
+                }
+                res.send(succInfo("删除成功"))
+            })
+    }
+    item_delete(req, res)
 })
 
 

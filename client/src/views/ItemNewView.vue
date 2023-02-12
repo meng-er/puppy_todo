@@ -7,20 +7,20 @@
                     <el-input v-model="form.title" />
                 </el-form-item>
                 <el-form-item label="category">
-                    <el-select @click="get_category" v-model="form.category" placeholder="please select">
-                        <el-option v-for="category in categories.list" :label="category.class_name"
-                            :value="category.class_name" />
-                    </el-select>
+                    <el-tree-select @node-click="get_childs" v-model="form.category" :data="categories"
+                        :render-after-expand="false" />
+                    <Edit @click="goto_category_edit"
+                        style="width: 1.5em; height: 1.5em; margin-left: 8px; cursor: pointer" />
                 </el-form-item>
                 <el-form-item label=" start&end">
                     <el-col :span="4">
-                        <el-date-picker v-model="form.start" type="datetime" placeholder="Select date and time" />
+                        <el-date-picker v-model="form.start" type="datetime" placeholder="begin" />
                     </el-col>
                     <el-col :span="2">
                         <span>to</span>
                     </el-col>
                     <el-col :span="4">
-                        <el-date-picker v-model="form.end" type="datetime" placeholder="Select date and time" />
+                        <el-date-picker v-model="form.end" type="datetime" placeholder="end" />
                     </el-col>
                 </el-form-item>
 
@@ -49,13 +49,7 @@ import { setMapStoreSuffix } from 'pinia';
 const route = useRoute()
 const router = useRouter()//跳转
 const session = route.query.session//登陆的参数
-
-if (JSON.stringify(route.query) == '{}') {
-    console.log("请重新登陆")
-    ElMessage.error("请重新登陆")
-    router.push({ path: 'login' })
-}
-
+const categories = reactive([])
 const form = reactive({
     title: '',
     category: '',
@@ -64,43 +58,83 @@ const form = reactive({
     note: '',
 })
 
+if (JSON.stringify(route.query) == '{}') {
+    console.log("请重新登陆")
+    ElMessage.error("请重新登陆")
+    router.push({ path: 'login' })
+}
 
-const get_category = () => {
-    // console.log("777")
-    // console.log(route.query)
-    api.category_show({ tel: route.query.tel, session: route.query.session }).then((res) => {
-        let category_arr = res.data.data
-        categories.list = res.data.data
+api.category_show({ tel: route.query.tel, session: route.query.session }).then((res) => {
+    // console.log("haha")
+    let category_arr = res.data.data
+    // console.log(category_arr)
+    let is_child = []
+    for (let i = 0; i < category_arr.length; i++) {
+        // if (category_arr[i].parent_id != -1 && is_child.indexOf(category_arr[i].parent_id) == -1) {
+        //     is_child.push(category_arr[i].parent_id)
+        // }
+        if (category_arr[i].parent_id == -1) {
+            categories.push({ label: category_arr[i].class_name, value: category_arr[i].class_id, children: [] })
+            api.category_showChild({ tel: route.query.tel, session: route.query.session, parent_id: category_arr[i].class_id }).then((res) => {
+                const childs = res.data.data
+                // console.log(childs)
+                for (let j = 0; j < childs.length; j++) {
+                    categories[i].children.push({ label: childs[j].class_name, value: childs[j].class_id, children: [] })
+                }
+            })
+        }
+    }
+})
+
+function get_childs(v) {
+    // console.log(v)
+    // console.log(v.$treeNodeId)
+    api.category_showChild({ tel: route.query.tel, session: route.query.session, parent_id: v.value }).then((res) => {
+        const childs = res.data.data
+        // console.log(childs)
+        for (let i = 0; i < childs.length; i++) {
+            api.category_showChild({ tel: route.query.tel, session: route.query.session, parent_id: childs[i].class_id }).then((res) => {
+                const childs2 = res.data.data
+                for (let j = 0; j < childs2.length && v.children[i].children.length != childs2.length; j++) {
+                    // console.log(v.children[i])
+                    // console.log(childs2[j])//后端
+                    v.children[i].children.push({ label: childs2[j].class_name, value: childs2[j].class_id, children: [] })
+                }
+            })
+        }
     })
 }
 
-
-
-
+function goto_category_edit() {
+    console.log("haha")
+    router.push({ path: 'editCategory', query: { tel: route.query.tel, session } })
+}
 
 const formatNumber = (n) => {
     n = n.toString()
     return n[1] ? n : '0' + n
 }
+
 // 时间格式化
 const formatTime = (date) => {
+    if (date == '') {
+        return ''
+    }
     const year = date.getFullYear()
     const month = date.getMonth() + 1
     const day = date.getDate()
     const hour = date.getHours()
     const minute = date.getMinutes()
     const second = date.getSeconds()
-
     return [year, month, day].map(formatNumber).join('-') + ' ' + [hour, minute, second].map(formatNumber).join(':')
 }
 
-
-
-const categories = reactive({ 'list': [] })
 const submit = () => {
-    console.log(route.query.tel)
-    console.log(route.query.session)
-
+    // console.log("heihei")
+    // console.log(form.category)
+    // console.log("heihei")
+    // console.log(route.query.tel)
+    // console.log(route.query.session)
     console.log(formatTime(form.start))
     api.item_new({
         tel: route.query.tel,
@@ -108,10 +142,17 @@ const submit = () => {
         title: form.title,
         note: form.note,
         start: formatTime(form.start),
-        end: '2023-02-06 00:00:00',
-        class_name: form.class_name,
+        end: formatTime(form.end),
+        class_id: form.category,
     }).then((res) => {
-        console.log(res.data)
+        if (res.data.code == 1) {
+            ElMessage({
+                message: '新增成功',
+                type: 'success',
+            })
+        } else {
+            ElMessage.error('新增失败:' + res.data.msg)
+        }
     })
 
 }

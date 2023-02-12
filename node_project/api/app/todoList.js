@@ -53,9 +53,9 @@ function category_new(req, res) {
 
 
 
-            console.log(isParentObj)
+            // console.log(isParentObj)
             if (isParentObj.code) {
-                console.log("ss")
+                // console.log("ss")
                 dbQuery('insert into category (parent_id,tel,class_name) values (?,?,?)', [req.body.parent_id, req.body.data.tel, req.body.class_name])
                     .then((resObj) => {
                         resolve(succInfo("新增类别成功", resObj.results.insertId))
@@ -132,7 +132,7 @@ app.post('/category/modify', (req, res) => {
             res.send(errInfo("父类不存在"))
             return
         }
-        console.log(isParentObj)
+        // console.log(isParentObj)
         var class_id = isParentObj.data[0].class_id
         dbQuery('update category set parent_id=?,class_name=? where class_id=?', [req.body.after.parent_id, req.body.after.class_name, class_id])
             .then((dbResObj) => {
@@ -149,6 +149,45 @@ app.post('/category/modify', (req, res) => {
 
 })
 
+
+
+app.post('/category/myParent', (req, res) => {
+    // console.log(req.body.data)
+    if (!req.body.data.tel || !req.body.data.session || !req.body.data.class_id) {
+        res.send(errInfo("myaprent信息不完整"))
+        return
+    }
+    const category_myParent = async (req, res) => {
+        await reqAuth(req, res)
+        const dbResObj = await dbQuery('select parent_id from category where tel=? and class_id=?', [req.body.data.tel, req.body.data.class_id])
+        if (dbResObj.results.length == 0 || dbResObj.error) {
+            res.send(errInfo("没有结果||数据库错误"))
+            return
+        }
+        let parent_id = dbResObj.results.parent_id
+        console.log(parent_id)
+        if (parent_id == -1) {
+            res.send(succInfo(-1))
+            return
+        }
+
+        dbQuery('select * from category where tel=? and class_id=?', [req.body.data.tel, parent_id])
+            .then((dbResObj) => {
+                if (dbResObj.error || dbResObj.results.length == 0) {
+                    log(dbResObj.error)
+                    res.send(errInfo("数据库错误"))
+                    return
+                }
+                res.send(succInfo(dbResObj.results))
+            })
+
+    }
+    category_myParent(req, res)
+
+})
+
+
+
 /*
 params: {
     tel: '13388110101',
@@ -162,8 +201,8 @@ app.post('/category/show', (req, res) => {
         let tel = req.body.data.tel
         await reqAuth(req, res)
         await dbQuery('select * from category where tel=?', tel).then((dbResObj) => {
-            if (resObj.error) {
-                log(resObj.error)
+            if (dbResObj.error) {
+                log(dbResObj.error)
                 res.send(errInfo("数据库错误"))
                 return
             }
@@ -172,6 +211,25 @@ app.post('/category/show', (req, res) => {
         })
     }
     category_show(req, res)
+})
+
+
+app.post('/category/showChild', (req, res) => {
+    const category_showChild = async (req, res) => {
+        let tel = req.body.data.tel
+        let parent_id = req.body.data.parent_id
+        await reqAuth(req, res)
+        await dbQuery('select * from category where tel=? and parent_id=?', [tel, parent_id]).then((dbResObj) => {
+            if (dbResObj.error) {
+                log(dbResObj.error)
+                res.send(errInfo("数据库错误"))
+                return
+            }
+            // log(dbResObj)
+            res.send(succInfo("查找成功", dbResObj.results))
+        })
+    }
+    category_showChild(req, res)
 })
 
 /*
@@ -228,37 +286,45 @@ params: {
 { 'msg': '新增事项成功', 'code': '1', '事项id': results.insertId }
 */
 app.post('/item/new', (req, res) => {
-    console.log(req.body.data)
     if (!req.body.data.tel || !req.body.data.session || !req.body.data.title) {
         res.send(errInfo("新增事项信息不完整"))//return到底加不加？
         return
     }
     const item_new = async (req, res) => {
         await reqAuth(req, res)
-        if (req.body.data.class_id) {
-            //有分类
-            dbQuery('insert into items (tel,title,note,start,end,class_id) values (?,?,?,?,?,?)', [req.body.data.tel, req.body.data.title, req.body.data.note, req.body.data.start, req.body.data.end, req.body.data.class_id])
-                .then((dbResObj) => {
-                    if (dbResObj.error) {
-                        log(dbResObj.error)
-                        res.send(errInfo("数据库错误"))
-                        return
-                    }
-                    res.send(succInfo("新增事项成功"))
-                })
-        } else {
-            console.log("else")
-            dbQuery('insert into items (tel,title,note,start,end,class_id) values (?,?,?,?,?,?)', [req.body.data.tel, req.body.data.title, req.body.data.note, req.body.data.start, req.body.data.end, -1])
-                .then((dbResObj) => {
-                    if (dbResObj.error) {
-                        log(dbResObj.error)
-                        res.send(errInfo("数据库错误"))
-                        return
-                    }
-                    res.send(succInfo("新增事项成功"))
-                })
+        let sqlStr = 'insert into items ('
+        let fieldValue = []
+        // console.log(req.body.data)
+        let count = 0
+        for (let val in req.body.data) {
+            if (req.body.data[val] != '' && val != 'session') {
+                sqlStr = sqlStr + val + ','
+                fieldValue.push(req.body.data[val])
+                // console.log(val + " " + req.body.data[val]);//输出如:name 
+                count++;
+            }
         }
+        sqlStr = sqlStr.slice(0, -1)//去掉最后一个逗号
+        sqlStr = sqlStr + ') values ('
+        for (let i = 0; i < count; i++) {
+            sqlStr = sqlStr + '?,'
+        }
+        sqlStr = sqlStr.slice(0, -1)//去掉最后一个逗号
+        sqlStr = sqlStr + ')'
+        // console.log(sqlStr)
+        // console.log(fieldValue)
+
+        dbQuery(sqlStr, fieldValue)
+            .then((dbResObj) => {
+                if (dbResObj.error) {
+                    log(dbResObj.error)
+                    res.send(errInfo("数据库错误"))
+                    return
+                }
+                res.send(succInfo("新增事项成功"))
+            })
     }
+
     item_new(req, res)
 })
 
@@ -294,7 +360,7 @@ app.post('/item/modify', (req, res) => {
         let sqlstr
         if (!req.body.after.start && !req.body.after.end) {
             sqlstr = 'update items set title="' + req.body.after.title + '",note="' + req.body.after.note + '",start=NULL,end=NULL,class_id=' + req.body.after.class_id + ' where item_id=' + req.body.item_id
-            console.log(sqlstr)
+            // console.log(sqlstr)
         } else {
             if (!req.body.after.start) {
                 sqlstr = 'update items set title="' + req.body.after.title + '",note="' + req.body.after.note + '",start=NULL,end="' + req.body.after.end + '",class_id=' + req.body.after.class_id + ' where item_id=' + req.body.item_id

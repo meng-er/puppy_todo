@@ -16,5 +16,11 @@ app.use(ElementPlus)
 import { createPinia } from 'pinia'
 app.use(createPinia())
 
+import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+    app.component(key, component)
+}
+
+
 // app.config.globalProperties.$axios = axios;
 app.mount('#app')

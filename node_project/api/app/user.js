@@ -7,7 +7,7 @@ const { app, getSession, log, succInfo, errInfo, dbQuery, reqAuth } = require('.
 const bodyParser = require('body-parser')
 app.use(bodyParser.json({}))
 
-let session
+let session = ''
 /*
 输入：
 params: {
@@ -87,8 +87,7 @@ app.post('/register', (req, res) => {
             log(resObj.error)
             res.send(errInfo("数据库错误"))
             return
-        }
-        res.send(succInfo("注册成功"))
+        } res.send(succInfo("注册成功"))
     }
     register(req, res)
 })

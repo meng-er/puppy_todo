@@ -160,11 +160,12 @@ app.post('/category/myParent', (req, res) => {
     const category_myParent = async (req, res) => {
         await reqAuth(req, res)
         const dbResObj = await dbQuery('select parent_id from category where tel=? and class_id=?', [req.body.data.tel, req.body.data.class_id])
-        if (dbResObj.results.length == 0 || dbResObj.error) {
+        if (dbResObj.results.length != 1 || dbResObj.error) {
             res.send(errInfo("没有结果||数据库错误"))
             return
         }
-        let parent_id = dbResObj.results.parent_id
+        console.log(dbResObj.results)
+        let parent_id = dbResObj.results[0].parent_id
         console.log(parent_id)
         if (parent_id == -1) {
             res.send(succInfo(-1))

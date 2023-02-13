@@ -42,6 +42,8 @@ import api from '../api'
 import { reactive, ref } from 'vue'
 import type { FormInstance } from 'element-plus'//import type 是用来协助进行类型检查和声明的，在运行时是完全不存在的。
 
+const login = api.login
+
 import { useRouter } from 'vue-router'
 const router = useRouter()
 
@@ -64,26 +66,25 @@ const submitForm = (formEl: FormInstance | undefined) => {
         if (valid) {
             // console.log(ruleForm)
             //🦦看这里看这里！是这在用
-            api.Login(
+            login(
                 { tel: ruleForm.tel, password: ruleForm.psw }
-            ).then(res => {
+            ).then((res) => {
                 //把后端返回的数据打印下来
-                // console.log('login response data', res.data.code)
+                // console.log('login response data', res.data)
                 if (res.data.code == 0) {
                     // console.log(res.data.msg)
                     ElMessage.error(res.data.msg)
                 } else {
                     // console.log(res.data.data)
-                    api.session = res.data.data
+                    // api.session = res.data.data
                     ElMessage({
                         message: '登陆成功',
                         type: 'success',
                     })
-                    router.push({ path: 'items', query: { tel: ruleForm.tel, session: api.session } })
+                    router.push({ path: 'items', query: { tel: ruleForm.tel } })
                 }
             })
         } else {
-            // console.log('error submit!')
             return false
         }
     })

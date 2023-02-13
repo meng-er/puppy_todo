@@ -23,7 +23,6 @@
                         <el-date-picker v-model="form.end" type="datetime" placeholder="end" />
                     </el-col>
                 </el-form-item>
-
                 <el-form-item label="note">
                     <el-input v-model="form.note" type="textarea" />
                 </el-form-item>
@@ -48,7 +47,6 @@ import { setMapStoreSuffix } from 'pinia';
 // 登陆的参数
 const route = useRoute()
 const router = useRouter()//跳转
-const session = route.query.session//登陆的参数
 const categories = reactive([])
 const form = reactive({
     title: '',
@@ -64,7 +62,7 @@ if (JSON.stringify(route.query) == '{}') {
     router.push({ path: 'login' })
 }
 
-api.category_show({ tel: route.query.tel, session: route.query.session }).then((res) => {
+api.reqApi('/category/show',{  tel: route.query.tel }).then((res) => {
     // console.log("haha")
     let category_arr = res.data.data
     // console.log(category_arr)
@@ -75,7 +73,7 @@ api.category_show({ tel: route.query.tel, session: route.query.session }).then((
         // }
         if (category_arr[i].parent_id == -1) {
             categories.push({ label: category_arr[i].class_name, value: category_arr[i].class_id, children: [] })
-            api.category_showChild({ tel: route.query.tel, session: route.query.session, parent_id: category_arr[i].class_id }).then((res) => {
+            api.reqApi('/category/showChild', { tel: route.query.tel, parent_id: category_arr[i].class_id }).then((res) => {
                 const childs = res.data.data
                 // console.log(childs)
                 for (let j = 0; j < childs.length; j++) {
@@ -89,11 +87,11 @@ api.category_show({ tel: route.query.tel, session: route.query.session }).then((
 function get_childs(v) {
     // console.log(v)
     // console.log(v.$treeNodeId)
-    api.category_showChild({ tel: route.query.tel, session: route.query.session, parent_id: v.value }).then((res) => {
+    api.reqApi('/category/showChild', { tel: route.query.tel, parent_id: v.value }).then((res) => {
         const childs = res.data.data
         // console.log(childs)
         for (let i = 0; i < childs.length; i++) {
-            api.category_showChild({ tel: route.query.tel, session: route.query.session, parent_id: childs[i].class_id }).then((res) => {
+            api.reqApi('/category/showChild', { tel: route.query.tel, parent_id: childs[i].class_id }).then((res) => {
                 const childs2 = res.data.data
                 for (let j = 0; j < childs2.length && v.children[i].children.length != childs2.length; j++) {
                     // console.log(v.children[i])
@@ -107,7 +105,7 @@ function get_childs(v) {
 
 function goto_category_edit() {
     console.log("haha")
-    router.push({ path: 'editCategory', query: { tel: route.query.tel, session } })
+    router.push({ path: 'editCategory', query: { tel: route.query.tel } })
 }
 
 const formatNumber = (n) => {
@@ -130,15 +128,11 @@ const formatTime = (date) => {
 }
 
 const submit = () => {
-    // console.log("heihei")
-    // console.log(form.category)
-    // console.log("heihei")
-    // console.log(route.query.tel)
-    // console.log(route.query.session)
+
     console.log(formatTime(form.start))
-    api.item_new({
+    api.reqApi('/item/new', {
         tel: route.query.tel,
-        session: route.query.session,
+
         title: form.title,
         note: form.note,
         start: formatTime(form.start),

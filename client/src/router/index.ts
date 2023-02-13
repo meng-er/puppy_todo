@@ -36,10 +36,14 @@ const router = createRouter({
     {
       path: '/newItem',
       component: () => import('../views/ItemNewView.vue')
-    } ,
+    },
     {
       path: '/editCategory',
       component: () => import('../views/EditCategoryView.vue')
+    },
+    {
+      path: '/test',
+      component: () => import('../views/test.vue')
     }
   ]
 })

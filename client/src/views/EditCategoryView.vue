@@ -2,7 +2,7 @@
     <el-container>
         <el-header style="background-color: gray;">编辑分类</el-header>
         <el-main>
-            <el-tree :data="categories" @node-click="get_childs_and_category_info"
+            <el-tree :data="categories"  draggable @node-drop="afterDrop" @node-click="get_childs_and_category_info"
                 @node-expand="get_childs_and_category_info" />
             <el-drawer size="45%" v-model="drawer" :title="selected_class_name" :direction="direction"
                 :before-close="handleClose">
@@ -133,28 +133,19 @@ function edit() {
 
 function new_category() {
     drawer_new.value = true
-    console.log(create)
+    // console.log(create)
 }
 
 
 function selected_category(parent_id) {
     after.parent_id = parent_id
-    // console.log("111111")
-    // console.log(after.parent_name)
-
-    // console.log(parent_id)
-    // console.log(node)
-    // console.log(v)
-    // console.log(parent_id)
 }
 
 function submit_modify() {
 
-    // console.log(after)
 }
-function submit_new()
-{
-    console.log(after)
+function submit_new() {
+    // console.log(after)
 
 }
 
@@ -170,7 +161,7 @@ const handleClose = (done) => {
 }
 
 //最基础的显示（可以显示根结点）
-api.category_show({ tel, session }).then((res) => {
+api.reqApi('/category/show', { tel, session }).then((res) => {
     // console.log("haha")
     let category_arr = res.data.data
     // console.log(category_arr)
@@ -182,7 +173,7 @@ api.category_show({ tel, session }).then((res) => {
         if (category_arr[i].parent_id == -1) {
             categories.push({ label: category_arr[i].class_name, value: category_arr[i].class_id, children: [] })
 
-            api.category_showChild({ tel: route.query.tel, session: route.query.session, parent_id: category_arr[i].class_id }).then((res) => {
+            api.reqApi('/category/showChild', { tel: route.query.tel, session: route.query.session, parent_id: category_arr[i].class_id }).then((res) => {
                 const childs = res.data.data
                 // console.log(childs)
                 for (let j = 0; j < childs.length; j++) {
@@ -200,7 +191,7 @@ function get_category_info(v) {
     // console.log(selected)
     // console.log(selected.class_name)
     before.class_name = selected.label
-    api.category_myParent({ tel: route.query.tel, session: route.query.session, class_id: selected.value }).then((res) => {
+    api.reqApi('/category/myParent', { tel: route.query.tel, session: route.query.session, class_id: selected.value }).then((res) => {
         // console.log(res.data.msg)
         if (res.data.msg == -1) {
             before.parent_name = '根类'
@@ -210,7 +201,7 @@ function get_category_info(v) {
         }
         before.parent_name = res.data.msg[0].class_name
         // after.parent_name = res.data.msg[0].class_name
-        console.log(categories_have_root)
+        // console.log(categories_have_root)
         after.parent_id = 12
         // after.parent_id = res.data.msg[0].class_id
     })
@@ -219,17 +210,17 @@ function get_category_info(v) {
 function get_childs(v) {
     // console.log(v)
     after.parent_name = v.label
-    console.log(after.parent_name)
-    api.category_showChild({ tel: route.query.tel, session: route.query.session, parent_id: v.value }).then((res) => {
+    // console.log(after.parent_name)
+    api.reqApi('/category/showChild', { tel: route.query.tel, session: route.query.session, parent_id: v.value }).then((res) => {
         const childs = res.data.data
-        console.log(childs)
+        // console.log(childs)
         for (let i = 0; i < childs.length; i++) {
-            api.category_showChild({ tel: route.query.tel, session: route.query.session, parent_id: childs[i].class_id }).then((res) => {
+            api.reqApi('/category/showChild', { tel: route.query.tel, session: route.query.session, parent_id: childs[i].class_id }).then((res) => {
                 const childs2 = res.data.data
                 for (let j = 0; j < childs2.length && v.children[i].children.length != childs2.length; j++) {
                     v.children[i].children.push({ label: childs2[j].class_name, value: childs2[j].class_id, children: [] })
                 }
-                console.log(v.children[i].children)
+                // console.log(v.children[i].children)
             })
         }
         // console.log(chi)
@@ -237,8 +228,7 @@ function get_childs(v) {
 }
 
 function get_childs_and_category_info(v) {
-    console.log("hhh")
-    console.log(v.children)
+
     get_childs(v)
     get_category_info(v)
 }

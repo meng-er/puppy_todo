@@ -9,14 +9,12 @@ const base = 'http://localhost:5173/api'
 
 const reqApi = (url, data) => {
     data.session = session
-    // console.log(data)
     return axios.post(base + url, data)
 }
 
 
 const getData = (res) => {
     return res.data
-
 }
 
 describe('注册', () => {
@@ -24,25 +22,21 @@ describe('注册', () => {
         const res = await reqApi('/register', { password })
         const resData = getData(res)
         expect(resData.msg).toEqual("tel不存在")
-        // console.log(data)
     })
     it('password不存在', async () => {
         const res = await reqApi('/register', { tel })
         const resData = getData(res)
         expect(resData.msg).toEqual("password不存在")
     })
-
     it('tel长度不符合要求', async () => {
         const res = await reqApi('/register', { tel: '1', password: '1' })
         const resData = getData(res)
         expect(resData.msg).toEqual("tel长度须为11")
-        // console.log(data)
     })
     it('password长度不符合要求', async () => {
         const res = await reqApi('/register', { tel, password: '1' })
         const resData = getData(res)
         expect(resData.msg).toEqual("password长度须大于5")
-        // console.log(data)
     })
     it('成功', async () => {
         const res = await reqApi('/register', { tel, password })
@@ -124,8 +118,6 @@ describe('/item/new 新增待办事项', () => {
 
 
 describe('/item/show 待办事项显示', () => {
-    console.log("/item/show 待办事项显示")
-
     it('成功', async () => {
         const res = await reqApi('/item/show', { tel })
         const resData = getData(res)
@@ -167,15 +159,25 @@ describe('/category/new 新增类别', () => {
     })
 })
 
-
 describe('/category/show 显示类别', () => {
+    let a
     it('成功', async () => {
-        const res = await reqApi('/category/show', { tel })
+        const res = await reqApi('/category/show', { tel, parent_id: -1 })
         const resData = getData(res)
+        console.log(resData)
+        a = resData.data[0].class_id
         expect(resData.data[0].class_name).toEqual('新增类')
-        expect(resData.data[1].class_name).toEqual('新增类2')
+        expect(resData.data.length).toEqual(1)
+        expect(resData.data[0].child_nums).toEqual(1)
 
         expect(resData.msg).toEqual('查找成功')
     })
+    it('成功', async () => {
+        const res = await reqApi('/category/show', { tel, parent_id: a })
+        const resData = getData(res)
+        console.log(resData)
+        expect(resData.data[0].class_name).toEqual('新增类2')
+        // expect(resData.data[1].class_name).toEqual('新增类2')
+        expect(resData.msg).toEqual('查找成功')
+    })
 })
-

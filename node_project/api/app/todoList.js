@@ -1,5 +1,5 @@
 
-const { getSession, log, succInfo, errInfo, dbQuery, reqAuth } = require('./main.js')
+const { log, succInfo, errInfo, dbQuery, reqAuth, getParams } = require('./main.js')
 const { app } = require('./user.js')
 // //中间件接收post
 // const bodyParser = require('body-parser')
@@ -35,28 +35,21 @@ function category_parent_check(tel, parent_id) {
           -否->父类存在？-是->succInfo("新增成功",class_id)
                        -否->errInfo("父类不存在")
 */
+/*
 function category_new(req, res) {
     return new Promise((resolve, reject) => {
         const category_new = async (req, res) => {
-            log(req.body.data.tel)
-            log(req.body.class_name)
-
-            const resObj = await dbQuery('select * from category where tel=? and class_name=?', [req.body.data.tel, req.body.class_name])
+            const resObj = await dbQuery('select * from category where tel=? and class_name=? and parent_id=?', [req.body.tel, req.body.class_name, req.body.parent_id])
             // console.log(resObj.results.length)
             if (resObj.results.length != 0) {
                 resolve(errInfo("已存在该类", resObj.results[0].class_id))
                 return
             }
-            // console.log(req.body.data.tel)
-            // console.log(req.body.parent_id)
-            const isParentObj = await category_parent_check(req.body.data.tel, req.body.parent_id)
-
-
-
+            const isParentObj = await category_parent_check(req.body.tel, req.body.parent_id)
             // console.log(isParentObj)
             if (isParentObj.code) {
                 // console.log("ss")
-                dbQuery('insert into category (parent_id,tel,class_name) values (?,?,?)', [req.body.parent_id, req.body.data.tel, req.body.class_name])
+                dbQuery('insert into category (parent_id,tel,class_name) values (?,?,?)', [req.body.parent_id, req.body.tel, req.body.class_name])
                     .then((resObj) => {
                         resolve(succInfo("新增类别成功", resObj.results.insertId))
                         return
@@ -68,6 +61,7 @@ function category_new(req, res) {
         category_new(req, res)
     })
 }
+*/
 
 /*
 params: {
@@ -77,25 +71,25 @@ params: {
             parent_id: '-1'
 }
 输出
-{ 'msg': "新增类别失败:父类不存在", 'code': '0' }
-{ 'msg': "新增类别失败:已存在该类", 'code': '0', 'class_id': results[0].class_id }
-{ 'msg': "新增类别成功", 'code': '1', 'class_id': results[0].class_id }
+{ 'msg': "父类不存在", 'code': '0' }
+{ 'msg': "新增成功", 'code': '1', 'class_id': dbData.results.insertId }
 */
-app.post('/category/new', (req, res) => {
-    if (!req.body.data.tel || !req.body.class_name || !req.body.parent_id || !req.body.data.session) {
-        res.send(errInfo("新增类别信息不完整"))
-    }
-    const category_new_main = async (req, res) => {
+app.post('/category/new', async (req, res) => {
+    try {
+        const params = await getParams(req, ["tel=11", "class_name>0", "parent_id>0", "session"])
         await reqAuth(req, res)
-        const category_new_resObj = await category_new(req, res)
-        // log(category_new_resObj)
-        if (category_new_resObj.code) {
-            res.send(succInfo("新增成功", category_new_resObj.msg))
-        } else {
-            res.send(errInfo("新增失败"))
+        if (params.parent_id != -1) {
+            const resObj = await dbQuery('select * from category where tel=? and class_id=?', [params.tel, params.parent_id])
+            if (resObj.results.length != 1) {
+                //如果没有parent，parent_id=-1,不能为空串、null、0
+                throw "父类不存在"
+            }
         }
+        const dbData = await dbQuery('insert into category (parent_id,tel,class_name) values (?,?,?)', [params.parent_id, params.tel, params.class_name])
+        res.send(succInfo("新增成功", dbData.results.insertId))
+    } catch (err) {
+        res.send(errInfo(err))
     }
-    category_new_main(req, res)
 })
 
 /*
@@ -151,28 +145,24 @@ app.post('/category/modify', (req, res) => {
 
 
 
-app.post('/category/myParent', (req, res) => {
-    // console.log(req.body.data)
-    if (!req.body.data.tel || !req.body.data.session || !req.body.data.class_id) {
-        res.send(errInfo("myaprent信息不完整"))
-        return
-    }
-    const category_myParent = async (req, res) => {
+app.post('/category/myParent', async (req, res) => {
+    try {
+        const params = getParams(req, ["tel=11", "session>0", "class_id"])
         await reqAuth(req, res)
-        const dbResObj = await dbQuery('select parent_id from category where tel=? and class_id=?', [req.body.data.tel, req.body.data.class_id])
+        const dbResObj = await dbQuery('select parent_id from category where tel=? and class_id=?', [params.tel, params.class_id])
         if (dbResObj.results.length != 1 || dbResObj.error) {
             res.send(errInfo("没有结果||数据库错误"))
             return
         }
-        console.log(dbResObj.results)
+        // console.log(dbResObj.results)
         let parent_id = dbResObj.results[0].parent_id
-        console.log(parent_id)
+        // console.log(parent_id)
         if (parent_id == -1) {
             res.send(succInfo(-1))
             return
         }
 
-        dbQuery('select * from category where tel=? and class_id=?', [req.body.data.tel, parent_id])
+        dbQuery('select * from category where tel=? and class_id=?', [paramsF.tel, parent_id])
             .then((dbResObj) => {
                 if (dbResObj.error || dbResObj.results.length == 0) {
                     log(dbResObj.error)
@@ -182,9 +172,10 @@ app.post('/category/myParent', (req, res) => {
                 res.send(succInfo(dbResObj.results))
             })
 
-    }
-    category_myParent(req, res)
 
+    } catch (err) {
+        res.send(errInfo(err))
+    }
 })
 
 
@@ -197,41 +188,40 @@ params: {
 输出
 { 'msg': "查找成功", 'code': '1', results }
 */
-app.post('/category/show', (req, res) => {
-    const category_show = async (req, res) => {
-        let tel = req.body.data.tel
+app.post('/category/show', async (req, res) => {
+    try {
+        const params = getParams(req, ["tel=11", "session"])
         await reqAuth(req, res)
-        await dbQuery('select * from category where tel=?', tel).then((dbResObj) => {
-            if (dbResObj.error) {
-                log(dbResObj.error)
-                res.send(errInfo("数据库错误"))
-                return
-            }
-            // log(dbResObj)
-            res.send(succInfo("查找成功", dbResObj.results))
-        })
+        // const dbData = await dbQuery('select a.class_id,a.parent_id,a.class_name,count(c.parent_id) child_nums from (select * from category where tel=? and parent_id=?) a left join (select * from category where tel=?) c on a.class_id=c.parent_id and a.tel=c.tel group by a.class_id,a.parent_id,a.class_name,c.parent_id;', [params.tel, params.parent_id, params.tel])
+        const dbData = await dbQuery('select * from category where parent_id=-1 and tel=?', [params.tel])
+        // console.log("haha")
+        if (dbData.error) {
+            res.send(errInfo("数据库错误"))
+            return
+        }
+        // console.log(dbData.results)
+        res.send(succInfo("查找成功", dbData.results))
+    } catch (err) {
+        res.send(errInfo(err))
     }
-    category_show(req, res)
+})
+app.post('/category/showChild', async (req, res) => {
+    try {
+        const params = getParams(req, ["tel=11", "session", "parent_id"])
+        await reqAuth(req, res)
+        const dbData = await dbQuery('select * from category where tel=? and parent_id=?', [params.tel, params.parent_id])
+        if (dbData.error) {
+            res.send(errInfo("数据库错误"))
+            return
+        }
+        res.send(succInfo("查找成功", dbData.results))
+
+    } catch (err) {
+        res.send(errInfo(err))
+    }
 })
 
 
-app.post('/category/showChild', (req, res) => {
-    const category_showChild = async (req, res) => {
-        let tel = req.body.data.tel
-        let parent_id = req.body.data.parent_id
-        await reqAuth(req, res)
-        await dbQuery('select * from category where tel=? and parent_id=?', [tel, parent_id]).then((dbResObj) => {
-            if (dbResObj.error) {
-                log(dbResObj.error)
-                res.send(errInfo("数据库错误"))
-                return
-            }
-            // log(dbResObj)
-            res.send(succInfo("查找成功", dbResObj.results))
-        })
-    }
-    category_showChild(req, res)
-})
 
 /*
 params: {
@@ -286,47 +276,19 @@ params: {
 输出
 { 'msg': '新增事项成功', 'code': '1', '事项id': results.insertId }
 */
-app.post('/item/new', (req, res) => {
-    if (!req.body.data.tel || !req.body.data.session || !req.body.data.title) {
-        res.send(errInfo("新增事项信息不完整"))//return到底加不加？
-        return
-    }
-    const item_new = async (req, res) => {
+app.post('/item/new', async (req, res) => {
+    try {
+        let params = await getParams(req, ["tel", "session", "title>0", "note", "start", "end", "class_id"])
         await reqAuth(req, res)
-        let sqlStr = 'insert into items ('
-        let fieldValue = []
-        // console.log(req.body.data)
-        let count = 0
-        for (let val in req.body.data) {
-            if (req.body.data[val] != '' && val != 'session') {
-                sqlStr = sqlStr + val + ','
-                fieldValue.push(req.body.data[val])
-                // console.log(val + " " + req.body.data[val]);//输出如:name 
-                count++;
-            }
-        }
-        sqlStr = sqlStr.slice(0, -1)//去掉最后一个逗号
-        sqlStr = sqlStr + ') values ('
-        for (let i = 0; i < count; i++) {
-            sqlStr = sqlStr + '?,'
-        }
-        sqlStr = sqlStr.slice(0, -1)//去掉最后一个逗号
-        sqlStr = sqlStr + ')'
-        // console.log(sqlStr)
-        // console.log(fieldValue)
-
-        dbQuery(sqlStr, fieldValue)
-            .then((dbResObj) => {
-                if (dbResObj.error) {
-                    log(dbResObj.error)
-                    res.send(errInfo("数据库错误"))
-                    return
-                }
-                res.send(succInfo("新增事项成功"))
-            })
+        let sqlStr = 'insert into items (tel,title,note,start,end,class_id) values (?,?,?,?,?,?)'
+        params.start = (params.start == '') ? null : params.start
+        params.end = (params.end == '') ? null : params.end
+        await dbQuery(sqlStr, [params.tel, params.title, params.note, params.start, params.end, params.class_id])
+        res.send(succInfo("新增事项成功"))
+    } catch (err) {
+        console.log(err)
+        res.send(err)
     }
-
-    item_new(req, res)
 })
 
 /*
@@ -388,23 +350,17 @@ app.post('/item/modify', (req, res) => {
 输出
 { 'msg': "查找成功", 'code': '1', 'sqlmsg': results }
 */
-app.post('/item/show', (req, res) => {
-    let tel = req.body.data.tel
-    let session = req.body.data.session
-    if (!tel || !session) {
-        res.send(errInfo("itemshow事项信息不完整"))
-    }
-    const showItem = async (req, res) => {
+app.post('/item/show', async (req, res) => {
+    try {
+        const params = getParams(req, ['tel', 'session'])
         await reqAuth(req, res)
-        dbQuery('select * from items where tel=?', tel)
-            .then((dbResObj) => {
-                console.log(dbResObj.results)
-                res.send(succInfo("查找成功", dbResObj.results))
-            })
+        const dbData = await dbQuery('select * from items where tel=?', params.tel)
+        res.send(succInfo("查找成功", dbData.results))
+    } catch (err) {
+        // console.log(err)
+        res.send(errInfo(err))
     }
-    showItem(req, res)
 })
-
 /*
 params: {
             tel: '13388110101',

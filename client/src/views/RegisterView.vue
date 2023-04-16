@@ -13,7 +13,7 @@
                             <el-input v-model="ruleForm.tel" />
                         </el-form-item>
                         <el-form-item label="password">
-                            <el-input v-model="ruleForm.psw" />
+                            <el-input v-model="ruleForm.password" />
                         </el-form-item>
                     </el-form>
 
@@ -37,7 +37,7 @@ import type { FormInstance } from 'element-plus'//import type 是用来协助进
 
 const ruleForm = reactive({
     tel: '',
-    psw: '',
+    password: '',
 })
 
 
@@ -50,7 +50,7 @@ const submitForm = (formEl: FormInstance | undefined) => {
     formEl.validate((valid) => {
         if (valid) {
             api.Register(
-                { tel: ruleForm.tel, password: ruleForm.psw }
+                { tel: ruleForm.tel, password: ruleForm.password }
             ).then(res => {
                 //把后端返回的数据打印下来
                 // console.log('login response data', res.data.code)

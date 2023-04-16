@@ -33,8 +33,6 @@
             </el-form>
         </el-main>
     </el-container>
-
-
 </template>
 
 <script setup>
@@ -57,14 +55,15 @@ const form = reactive({
 })
 
 if (JSON.stringify(route.query) == '{}') {
-    console.log("请重新登陆")
+    // console.log("请重新登陆")
     ElMessage.error("请重新登陆")
     router.push({ path: 'login' })
 }
 
-api.reqApi('/category/show',{  tel: route.query.tel }).then((res) => {
+api.reqApi('/category/show', { tel: route.query.tel }).then((res) => {
     // console.log("haha")
     let category_arr = res.data.data
+    // console.log(res.data)
     // console.log(category_arr)
     let is_child = []
     for (let i = 0; i < category_arr.length; i++) {
@@ -73,6 +72,7 @@ api.reqApi('/category/show',{  tel: route.query.tel }).then((res) => {
         // }
         if (category_arr[i].parent_id == -1) {
             categories.push({ label: category_arr[i].class_name, value: category_arr[i].class_id, children: [] })
+
             api.reqApi('/category/showChild', { tel: route.query.tel, parent_id: category_arr[i].class_id }).then((res) => {
                 const childs = res.data.data
                 // console.log(childs)
@@ -104,7 +104,7 @@ function get_childs(v) {
 }
 
 function goto_category_edit() {
-    console.log("haha")
+    // console.log("haha")
     router.push({ path: 'editCategory', query: { tel: route.query.tel } })
 }
 
@@ -128,11 +128,10 @@ const formatTime = (date) => {
 }
 
 const submit = () => {
-
+    // if (coß
     console.log(formatTime(form.start))
     api.reqApi('/item/new', {
         tel: route.query.tel,
-
         title: form.title,
         note: form.note,
         start: formatTime(form.start),
@@ -144,6 +143,8 @@ const submit = () => {
                 message: '新增成功',
                 type: 'success',
             })
+            router.push({ path: 'items', query: { tel: route.query.tel } })
+
         } else {
             ElMessage.error('新增失败:' + res.data.msg)
         }

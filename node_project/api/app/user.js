@@ -1,11 +1,14 @@
 
 
 //函数们
-const { app, getSession, log, succInfo, errInfo, dbQuery, reqAuth } = require('./main.js')
+const { app, getSession, log, succInfo, errInfo, dbQuery, getParams } = require('./main.js')
 
 //中间件接收post
 const bodyParser = require('body-parser')
 app.use(bodyParser.json({}))
+
+
+
 
 let session = ''
 /*
@@ -15,114 +18,126 @@ params: {
     password: '123'
 }
 输出：
-{ 'msg': "登录成功", 'code': '1', 'session': session }
-{ 'msg': "密码错误", 'code': '-1', 'session': '' }
-{ 'msg': "表单信息不完整", 'code': '-1', 'session': '' }
+{ 'msg': "登录成功", 'code': '1', 'data': session }
+
+{ 'msg': "密码错误", 'code': '0 }
+{ 'msg': "登录表单信息不完整", 'code': '0'}
+{ 'msg': "账户不存在或账户不唯一", 'code': '0'}
+{ 'msg': "数据库错误", 'code': '0'}
 */
 app.post('/login', function (req, res) {
-    const login = async (req, res) => {
-        let tel = req.body.data.tel
-        let psw = req.body.data.password
-        if (tel && psw) {
-            const resObj = await dbQuery('select password from users where tel=?', tel)
-            if (resObj.error) {
-                log(resObj.error)
+    try {
+        // throw "01"
+        const params = getParams(req, ['tel=11', 'password'])
+        // console.log(params)
+        const login = async (req, res) => {
+            const dbData = await dbQuery('select password from users where tel=?', params.tel)
+            if (dbData.error) {
+                log(dbData.error)
                 res.send(errInfo("数据库错误"))
                 return
             }
-            if (resObj.results.length != 1) {
+            if (dbData.results.length != 1) {
                 res.send(errInfo("账户不存在或账户不唯一", ''))
                 return
             }
-            if (resObj.results[0].password == psw) {
+          
+            if (dbData.results[0].password == params.password) {
                 session = getSession();
-                const resObj = await dbQuery('update users set session=? where tel=?', [session, tel])
-                if (resObj.error) {
-                    log(resObj.error)
+                const dbData = await dbQuery('update users set session=? where tel=?', [session, params.tel])
+                if (dbData.error) {
+                    log(dbData.error)
                     res.send(errInfo("数据库错误"))
                     return
                 }
-                // console.log(session)
-                res.send(succInfo("登陆成功", session))
+               
+                res.send(succInfo("登录成功", session))
             } else {
                 res.send(errInfo("密码错误"))
             };
+
         }
-        else {
-            res.send({ 'msg': "登陆表单信息不完整", 'code': 0 })
-        }
+        login(req, res)
+    } catch (err) {
+        // console.log("2")
+        // console.log(err)
+        res.send(errInfo(err))
     }
-    login(req, res)
 })
 
 /*
 输入
 params: {
         tel: '13308110101',
-        password: '123'
+
     }
 输出
-{ 'msg': "信息不完整", 'code': '0' }
 { 'msg': "账户已存在", 'code': '0' }
-{ 'msg': "注册成功", 'code': '1' }
+{ 'msg': "数据库错误", 'code': '0' }
+{ 'msg': "注册成功", 'code': '1' ,'data':''}
 */
+
 app.post('/register', (req, res) => {
-    let tel = req.body.data.tel
-    let psw = req.body.data.password
-    // console.log(tel.length)
-    if (tel.length != 11 || !psw) {
-        res.send(errInfo("信息不完整"))
-        return
-    }
-    const register = async (req, res) => {
-        let resObj = await dbQuery('select * from users where tel=?', tel,)
-        console.log(resObj.results.length)
-        if (resObj.results.length != 0) {
-            // console.log("h")
-            res.send(errInfo("账户已存在"))
-            return
+    try {
+        const params = getParams(req, ['tel=11', 'password>5'])
+        const register = async (req, res) => {
+            let dbData = await dbQuery('select * from users where tel=?', params.tel)
+            // console.log(dbData.results.length)
+            if (dbData.results.length != 0) {
+                res.send(errInfo("账户已存在"))
+                return
+
+            }
+            dbData = await dbQuery('insert into users set tel=?,password=?,session=""', [params.tel, params.password])
+            if (dbData.error) {
+                res.send(errInfo("数据库错误"))
+                return
+            }
+            res.send(succInfo("注册成功"))
         }
-        resObj = await dbQuery('insert into users set tel=?,password=?,session=""', [tel, psw])
-        if (resObj.error) {
-            log(resObj.error)
-            res.send(errInfo("数据库错误"))
-            return
-        } res.send(succInfo("注册成功"))
+        register(req, res)
+    } catch (err) {
+        // console.log(err)
+        res.send(errInfo(err))
     }
-    register(req, res)
 })
 
 /*
 输入：
 params: {
             tel: '13388110101',
-            originalPwd: '123',
-            newPwd: '000000',
-            session: session+''
+            oldPassword: '123',
+            newPassword: '000000',
         }
 输出
-{ 'msg': "修改密码成功", 'code': '1' }
+{ 'msg': "修改密码成功", 'code': '1','data':'' }
+
 { 'msg': "旧密码输入错误", 'code': '0' }
-{ 'msg': "信息不完整", 'code': '0' }
+{ 'msg': "重置密码信息不完整", 'code': '0' }
+{ 'msg': "用户信息错误", 'code': '0' }
 */
-app.post('/resetPwd', (req, res) => {
-    if (tel.length != 11 || !req.body.originalPwd || !req.body.newPwd || !req.body.session) {
-        res.send(errInfo("信息不完整"))
+app.post('/resetPassword', (req, res) => {
+    const params = getParams(req)
+    if (params.tel.length != 11 || !params.oldPassword || !params.newPassword) {
+        res.send(errInfo("重置密码信息不完整"))
+        return
     }
-    const resetPwd = async (req, res) => {
-        await reqAuth(req, res)
-        let resObj = await dbQuery('select password,session from users where tel=?', tel)
-        if (resObj.results.length != 1) {
+    const resetPassword = async (req, res) => {
+        let dbData = await dbQuery('select password,session from users where tel=?', params.tel)
+        if (dbData.results.length != 1) {
             res.send(errInfo("用户信息错误"))
+            return
+
         }
-        if ((resObj.results[0].password) == req.body.originalPwd) {
-            await dbQuery('update users set password=? where tel=?', [req.body.newPwd, tel])
-            res.send(succInfo("修改密码成功"))
+        if ((dbData.results[0].password) == params.oldPassword) {
+            await dbQuery('update users set password=? where tel=?', [params.newPassword, params.tel])
+            res.send(succInfo("修改密码成功", ''))
         } else {
             res.send(errInfo("旧密码输入错误"))
+
         };
     }
-    resetPwd(req, res)
+    resetPassword(req, res)
 })
 module.exports = { app }
 

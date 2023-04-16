@@ -9,7 +9,7 @@ const base = 'http://localhost:5173/api'//这个api随便替换成想要的名�
 
 const login = async (data: { [key: string]: any }) => {
     //data是get请求的参数
-    let res = await Axios.post(base + '/login', { data })
+    let res = await Axios.post(base + '/login', data)
     if (res.data.code == 1) {
         session.value = res.data.data
     }
@@ -17,14 +17,15 @@ const login = async (data: { [key: string]: any }) => {
 }
 
 const Register = (data: { [key: string]: any }) => {
-    return Axios.post(base + '/register', { data })
+    return Axios.post(base + '/register', data)
 }
 
 const reqApi = (url: string, data: any) => {
     data.session = session.value
-    console.log(session.value)
-    console.log(data)
-    return Axios.post(base + url, { data })
+    // console.log("haha")
+    // console.log(session.value)
+    // console.log(data)
+    return Axios.post(base + url, data)
 }
 
 
